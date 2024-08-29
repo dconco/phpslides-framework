@@ -20,14 +20,37 @@ function getCodeSnippet(
 	int $linesBefore = 5,
 	int $linesAfter = 5
 ): array {
+	if (empty($file) || empty($line)) {
+	   $message = 'Unable to read & parse code!';
+	   
+		return [
+			'rawCode' => $message,
+			'parsedCode' => [$message]
+		];
+	}
+
 	if (!file_exists($file) || !is_readable($file)) {
-		throw new Exception("Cannot read file: $file");
+		$path = $GLOBALS['__gen_file_path'];
+
+		if (isset($path) && file_exists($path)) {
+			/**
+			 * This is coming from view file
+			 */
+			$code = file($path);
+			$content = htmlspecialchars(file_get_contents($path), ENT_NOQUOTES);
+			unset($GLOBALS['__gen_file_path']);
+			unlink($path);
+		} else {
+			throw new Exception("Cannot read file: $file");
+		}
+	} else {
+		$code = file($file);
+		$content = htmlspecialchars(file_get_contents($file), ENT_NOQUOTES);
 	}
 
 	$startLine = max(1, $line - $linesBefore);
 	$endLine = $line + $linesAfter;
 
-	$code = file($file);
 	$snippet = array_slice(
 		$code,
 		$startLine - 1,
@@ -36,7 +59,7 @@ function getCodeSnippet(
 	);
 
 	return [
-		'rawCode' => htmlspecialchars(file_get_contents($file)),
+		'rawCode' => $content,
 		'parsedCode' => $snippet
 	];
 }

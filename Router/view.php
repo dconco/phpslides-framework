@@ -32,30 +32,19 @@ final class view extends Controller
 	 *
 	 *   --------------------------------------------------------------
 	 */
-	final public static function render (string $view): mixed
+	final public static function render(string $view): mixed
 	{
 		// split :: into array and extract the folder and files
 		$file = preg_replace('/(::)|::/', '/', $view);
 		$file = strtolower(trim($file, '\/\/'));
 		$file_uri = Application::$viewsDir . $file;
+		header('Content-Type: text/html');
 
-		if (is_file($file_uri . '.view.php') && !preg_match('/(..\/)/', $view))
-		{
-			$file_type = self::file_type($file_uri . '.view.php');
-			header("Content-Type: $file_type");
-
+		if (is_file($file_uri . '.view.php') && !preg_match('/(..\/)/', $view)) {
 			return self::slides_include($file_uri . '.view.php');
-		}
-		elseif (is_file($file_uri) && !preg_match('/(..\/)/', $view))
-		{
-			$file_type = self::file_type($file_uri);
-			header("Content-Type: $file_type");
-
+		} elseif (is_file($file_uri) && !preg_match('/(..\/)/', $view)) {
 			return self::slides_include($file_uri);
-		}
-		else
-		{
-			self::log();
+		} else {
 			throw new Exception("No view file path found called `$file_uri`");
 		}
 	}

@@ -6,9 +6,30 @@ use PhpSlides\Exception;
 
 class ViewLoader
 {
-	private array $result = [];
+	private array|null $result = null;
 
+	/**
+	 * Load view file in view formatted way
+	 *
+	 * @throws Exception if the file does not seem to be existing
+	 * @return self
+	 */
 	public function load ($viewFile): self
+	{
+		if (!is_file($viewFile))
+		{
+			throw new Exception("File does not exist: $viewFile");
+		}
+		return self::safeLoad($viewFile);
+	}
+
+	/**
+	 * Load view file in view formatted way.
+	 * If the file does not exist then nothing will be executed.
+	 *
+	 * @return self
+	 */
+	public function safeLoad ($viewFile): self
 	{
 		if (is_file($viewFile))
 		{
@@ -32,17 +53,15 @@ class ViewLoader
 				$parsedLoad = (new FileLoader())->parseLoad($gen_file);
 				$this->result[] = $parsedLoad->getLoad();
 
-				return $this;
+				unlink($gen_file);
+				unset($GLOBALS['__gen_file_path']);
 			}
 			finally
 			{
-				unlink($gen_file);
+				$GLOBALS['__gen_file_path'] = $gen_file;
 			}
 		}
-		else
-		{
-			throw new Exception("File not found: $viewFile");
-		}
+		return $this;
 	}
 
 	/**
@@ -50,7 +69,7 @@ class ViewLoader
 	 */
 	public function getLoad ()
 	{
-		if (count($this->result) === 1)
+		if (count($this->result ?? []) === 1)
 		{
 			return $this->result[0];
 		}
@@ -67,22 +86,34 @@ class ViewLoader
 		 function ($matches)
 		 {
 			 $path = trim($matches[1]);
-			 return '<' . '?' . ' slides_include(__DIR__ . \'/' . $path . '\') ?' . '>';
+			 return '<' .
+			  '? slides_include(__DIR__ . \'/' .
+			  $path .
+			  '\') ?' . '>';
 		 },
-		 $contents
+		$contents
 		);
 
-		// replace <? elements
+		// Replace bracket interpolation {{ }}
 		$formattedContents = preg_replace_callback(
-		 '/<' . '\?' . ' ([^?]*)\?' . '>/s',
-		 function ($matches)
-		 {
-			 $val = trim($matches[1]);
-			 $val = trim($val, ';');
-			 return '<' . '?php print_r(' . $val . ') ?>';
-		 },
+		'/{{\s*(.*?)\s*}}/',
+		function ($matches)
+		{
+			return '"<' . '?php print_r(' . $matches[1] . ') ?' . '>"';
+		},
+		 $formattedContents
+		 );
+
+		// replace <? elements
+		$formattedContents = preg_replace_callback('/<' . '\?' . '\s+([^?]*)\?' . '>/s',
+		function ($matches)
+		{
+			$val = trim($matches[1]);
+			$val = trim($val, ';');
+			return '<' . '?php print_r(' . $val . ') ?' . '>';
+		},
 		$formattedContents
-		);
+		  );
 
 		return $formattedContents;
 	}

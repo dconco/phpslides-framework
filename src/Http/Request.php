@@ -3,6 +3,7 @@
 namespace PhpSlides\Http;
 
 use stdClass;
+use PhpSlides\Formatter\Validate;
 use PhpSlides\Foundation\Application;
 use PhpSlides\Http\Auth\Authentication;
 use PhpSlides\Http\Interface\RequestInterface;
@@ -15,6 +16,7 @@ use PhpSlides\Http\Interface\RequestInterface;
 class Request extends Application implements RequestInterface
 {
 	use Authentication;
+	use Validate;
 
 	/**
 	 * @var ?array The URL parameters.
@@ -60,7 +62,7 @@ class Request extends Application implements RequestInterface
 		while ($i < count($parsed)) {
 			$p = mb_split('=', $parsed[$i]);
 			$key = $p[0];
-			$value = $p[1] ?? null;
+			$value = $p[1] ? $this->validate($p[1]) : null;
 
 			$cl->$key = $value;
 			$i++;
@@ -73,12 +75,20 @@ class Request extends Application implements RequestInterface
 	 * Retrieves headers from the request.
 	 *
 	 * @param ?string $name Optional header name to retrieve a specific header.
-	 * @return array|string The headers, or a specific header value if $name is provided.
+	 * @return mixed The headers, or a specific header value if $name is provided.
 	 */
-	public function headers(?string $name = null): array|string
+	public function headers(?string $name = null): mixed
 	{
 		$headers = getallheaders();
-		return !$name ? $headers : htmlspecialchars($headers[$name]);
+
+		if (!$name) {
+			return array_map([$this, 'validate'], $headers);
+		}
+		if (isset($headers[$name])) {
+			return $this->validate($headers[$name]);
+		} else {
+			return null;
+		}
 	}
 
 	/**
@@ -86,7 +96,7 @@ class Request extends Application implements RequestInterface
 	 *
 	 * @return stdClass The authentication credentials.
 	 */
-	public function Auth(): stdClass
+	public function auth(): stdClass
 	{
 		$cl = new stdClass();
 		$cl->basic = self::BasicAuthCredentials();
@@ -96,11 +106,13 @@ class Request extends Application implements RequestInterface
 	}
 
 	/**
+	 * Get the request body and if no parameter is specified,
 	 * Parses and returns the body of the request as an associative array.
 	 *
-	 * @return ?array The request body data, or null if parsing fails.
+	 * @param ?string $name The particular request body to get
+	 * @return mixed The request body data, or null if parsing fails.
 	 */
-	public function body(): ?array
+	public function body(?string $name = null): mixed
 	{
 		$data = json_decode(file_get_contents('php://input'), true);
 
@@ -108,10 +120,14 @@ class Request extends Application implements RequestInterface
 			return null;
 		}
 
+		if ($name !== null) {
+			return $this->validate($data[$name]);
+		}
+
 		$res = [];
 		foreach ($data as $key => $value) {
-			$key = trim(htmlspecialchars($key));
-			$value = trim(htmlspecialchars($value));
+			$key = $this->validate($key);
+			$value = $this->validate($value);
 
 			$res[$key] = $value;
 		}
@@ -120,60 +136,76 @@ class Request extends Application implements RequestInterface
 
 	/**
 	 * Retrieves a GET parameter by key.
+	 * And if no parameter is provided, returns all key and values in pairs
 	 *
-	 * @param string $key The key of the GET parameter.
-	 * @return ?string The parameter value, or null if not set.
+	 * @param ?string $key The key of the GET parameter.
+	 * @return mixed The parameter value, or null if not set.
 	 */
-	public function get(string $key): ?string
+	public function get(?string $key = null): mixed
 	{
+		if (!$key) {
+			return array_map([$this, 'validate'], $_GET);
+		}
 		if (!isset($_GET[$key])) {
 			return null;
 		}
 
-		$data = trim(htmlspecialchars($_GET[$key]));
+		$data = $this->validate($_GET[$key]);
 		return $data;
 	}
 
 	/**
 	 * Retrieves a POST parameter by key.
+	 * And if no parameter is provided, returns all key and values in pairs
 	 *
 	 * @param string $key The key of the POST parameter.
-	 * @return ?string The parameter value, or null if not set.
+	 * @return mixed The parameter values, or null if not set.
 	 */
-	public function post(string $key): ?string
+	public function post(?string $key = null): mixed
 	{
+		if (!$key) {
+			return array_map([$this, 'validate'], $_POST);
+		}
 		if (!isset($_POST[$key])) {
 			return null;
 		}
 
-		$data = trim(htmlspecialchars($_POST[$key]));
+		$data = $this->validate($_POST[$key]);
 		return $data;
 	}
 
 	/**
 	 * Retrieves a request parameter by key from all input sources.
+	 * And if no parameter is provided, returns all key and values in pairs
 	 *
-	 * @param string $key The key of the request parameter.
-	 * @return ?string The parameter value, or null if not set.
+	 * @param ?string $key The key of the request parameter.
+	 * @return mixed The parameter value, or null if not set.
 	 */
-	public function request(string $key): ?string
+	public function request(?string $key = null): mixed
 	{
+		if (!$key) {
+			return array_map([$this, 'validate'], $_REQUEST);
+		}
 		if (!isset($_REQUEST[$key])) {
 			return null;
 		}
 
-		$data = trim(htmlspecialchars($_REQUEST[$key]));
+		$data = $this->validate($_REQUEST[$key]);
 		return $data;
 	}
 
 	/**
 	 * Retrieves file data from the request by name.
+	 * And if no parameter is provided, returns all key and values in pairs
 	 *
-	 * @param string $name The name of the file input.
-	 * @return ?object File data, or null if not set.
+	 * @param ?string $name The name of the file input.
+	 * @return object|null File data, or null if not set.
 	 */
-	public function files(string $name): ?object
+	public function files(?string $name = null): object|null
 	{
+		if (!$name) {
+			return (object) $_FILES;
+		}
 		if (!isset($_FILES[$name])) {
 			return null;
 		}
@@ -186,14 +218,29 @@ class Request extends Application implements RequestInterface
 	 * Retrieves a cookie value by key, or all cookies if no key is provided.
 	 *
 	 * @param ?string $key Optional cookie key.
-	 * @return string|object|null The cookie value, all cookies as an object, or null if key is provided but not found.
+	 * @return mixed The cookie value, all cookies as an object, or null if key is provided but not found.
 	 */
-	public function cookie(?string $key = null): string|object|null
+	public function cookie(?string $key = null): mixed
 	{
 		if (!$key) {
-			return (object) $_COOKIE;
+			return (object) array_map([$this, 'validate'], $_COOKIE);
 		}
-		return htmlspecialchars($_COOKIE[$key]);
+		return isset($_COOKIE[$key]) ? $this->validate($_COOKIE[$key]) : null;
+	}
+
+	/**
+	 * Retrieves a session value by key, or all session if no key is provided.
+	 *
+	 * @param ?string $key Optional cookie key.
+	 * @return mixed The cookie value, all cookies as an object, or null if key is provided but not found.
+	 */
+	public function session(?string $key = null): mixed
+	{
+		session_status() < 2 && session_start();
+		if (!$key) {
+			return (object) array_map([$this, 'validate'], $_SESSION);
+		}
+		return isset($_SESSION[$key]) ? $this->validate($_SESSION[$key]) : null;
 	}
 
 	/**
@@ -239,7 +286,7 @@ class Request extends Application implements RequestInterface
 	 */
 	public function ip(): string
 	{
-		return $_SERVER['REMOTE_ADDR'];
+		return $this->validate($_SERVER['REMOTE_ADDR']);
 	}
 
 	/**
@@ -249,7 +296,7 @@ class Request extends Application implements RequestInterface
 	 */
 	public function userAgent(): string
 	{
-		return $_SERVER['HTTP_USER_AGENT'];
+		return $this->validate($_SERVER['HTTP_USER_AGENT']);
 	}
 
 	/**
@@ -270,7 +317,9 @@ class Request extends Application implements RequestInterface
 	 */
 	public function referrer(): ?string
 	{
-		return isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : null;
+		return isset($_SERVER['HTTP_REFERER'])
+			? $this->validate($_SERVER['HTTP_REFERER'])
+			: null;
 	}
 
 	/**
@@ -280,7 +329,7 @@ class Request extends Application implements RequestInterface
 	 */
 	public function protocol(): string
 	{
-		return $_SERVER['SERVER_PROTOCOL'];
+		return $this->validate($_SERVER['SERVER_PROTOCOL']);
 	}
 
 	/**
@@ -291,18 +340,22 @@ class Request extends Application implements RequestInterface
 	public function all(): array
 	{
 		$data = array_merge($_GET, $_POST, $this->body() ?? []);
-		return array_map('htmlspecialchars', $data);
+		return array_map([$this, 'validate'], $data);
 	}
 
 	/**
 	 * Retrieves a parameter from the $_SERVER array.
+	 * And if no parameter is provided, it returns all the keys and values in pairs
 	 *
 	 * @param string $key The key of the server parameter.
-	 * @return string|null The server parameter value, or null if not set.
+	 * @return mixed The server parameter value, or null if not set.
 	 */
-	public function server(string $key): ?string
+	public function server(?string $key = null): mixed
 	{
-		return isset($_SERVER[$key]) ? $_SERVER[$key] : null;
+		if (!$key) {
+			return (object) array_map([$this, 'validate'], $_SERVER);
+		}
+		return isset($_SERVER[$key]) ? $this->validate($_SERVER[$key]) : null;
 	}
 
 	/**

@@ -1,12 +1,13 @@
 <?php declare(strict_types=1);
 
-namespace PhpSlides\Console;
+namespace PhpSlides;
 
-use PhpSlides\Console\Server;
-use PhpSlides\Console\Style\ColorCode;
-use PhpSlides\Console\Interface\CommandInterface;
-use PhpSlides\Console\Interface\ConsoleInterface;
-use PhpSlides\Console\Style\Console as StyleConsole;
+use PhpSlides\CLI\Server;
+use PhpSlides\CLI\Command;
+use PhpSlides\CLI\Style\ColorCode;
+use PhpSlides\CLI\Interface\CommandInterface;
+use PhpSlides\CLI\Style\Console as StyleConsole;
+use PhpSlides\Interface\ConsoleInterface;
 use PhpSlides\Foundation\Application;
 
 /**
@@ -21,7 +22,7 @@ class Console extends Command implements CommandInterface, ConsoleInterface
 	private static bool $serve = false;
 	private static bool $is_debug = false;
 	private static string $resolve = 'src/bootstrap';
-	private static ?array $make = null;
+	private static ?array $commands = null;
 
 	/**
 	 * Console constructor.
@@ -53,7 +54,7 @@ class Console extends Command implements CommandInterface, ConsoleInterface
 						"<name> argument is required! Type --help for list of commands\n"
 					);
 				}
-				self::$make = ['controller', $arguments];
+				self::$commands = ['controller', $arguments];
 				break;
 
 			case 'make:api-controller':
@@ -62,23 +63,27 @@ class Console extends Command implements CommandInterface, ConsoleInterface
 						"<name> argument is required! Type --help for list of commands\n"
 					);
 				}
-				self::$make = ['api-controller', $arguments];
+				self::$commands = ['api-controller', $arguments];
 				break;
 
-			case 'make:middleware':
+			case 'make:auth-guard':
 				if (count($arguments) < 1) {
 					exit(
 						"<name> argument is required! Type --help for list of commands\n"
 					);
 				}
-				self::$make = ['middleware', $arguments];
+				self::$commands = ['auth-guard', $arguments];
+				break;
+
+			case 'generate:secret-key':
+				self::$commands = ['secret-key', $arguments];
 				break;
 
 			default:
 				$styles = [ColorCode::WHITE, ColorCode::BG_RED];
 
 				echo StyleConsole::text(
-					'Command not Recognized! See \'php slides --help\'',
+					'Command not Recognized! See \'php slide --help\'',
 					...$styles
 				);
 				break;
@@ -88,7 +93,6 @@ class Console extends Command implements CommandInterface, ConsoleInterface
 	/**
 	 * Console destructor.
 	 */
-	const SERVE_FROM_TERMINAL = 'true';
 	public function __destruct()
 	{
 		if (self::$serve) {
@@ -99,16 +103,19 @@ class Console extends Command implements CommandInterface, ConsoleInterface
 			);
 		}
 
-		if (self::$make) {
-			switch (self::$make[0]) {
+		if (self::$commands) {
+			switch (self::$commands[0]) {
 				case 'controller':
-					self::makeController(self::$make[1], self::$resolve);
+					self::makeController(self::$commands[1], self::$resolve);
 					break;
 				case 'api-controller':
-					self::makeApiController(self::$make[1], self::$resolve);
+					self::makeApiController(self::$commands[1], self::$resolve);
 					break;
-				case 'middleware':
-					self::makeMiddleware(self::$make[1], self::$resolve);
+				case 'auth-guard':
+					self::makeAuthGuard(self::$commands[1], self::$resolve);
+					break;
+				case 'secret-key':
+					self::generateSecretKey(self::$commands[1]);
 					break;
 				default:
 					exit('Error.');

@@ -14,7 +14,7 @@ class MapRoute extends Controller implements MapInterface
 	private static string|array $route;
 	private static string $request_uri;
 	private static string $charset;
-	private static string $method;
+	private static array $method;
 
 	/**
 	 * Validating $route methods
@@ -25,8 +25,8 @@ class MapRoute extends Controller implements MapInterface
 	public function match(string $method, string|array $route): bool|array
 	{
 		$config_file = self::config_file();
-		self::$charset = $config_file['charset'];
-		self::$method = strtoupper((string) $method);
+		self::$charset = $config_file['charset'] ?? 'UTF-8';
+		self::$method = explode('|', $method);
 		/**
 		 *   ----------------------------------------------
 		 *   |   Replacing first and last forward slashes
@@ -36,17 +36,14 @@ class MapRoute extends Controller implements MapInterface
 		if (!empty(Application::$request_uri))
 		{
 			self::$request_uri = strtolower(
-			 preg_replace(
-			  "/(^\/)|(\/$)/",
-			  '',
-			  Application::$request_uri
-			 )
+			 preg_replace("/(^\/)|(\/$)/", '', Application::$request_uri)
 			);
 		}
 		else
 		{
 			self::$request_uri = '/';
 		}
+
 		self::$route = is_array($route)
 		 ? $route
 		 : strtolower(preg_replace("/(^\/)|(\/$)/", '', $route));
@@ -103,7 +100,7 @@ class MapRoute extends Controller implements MapInterface
 		 *   |   Exploding request uri string to array to get the exact index number value of parameter from $_REQUEST['uri']
 		 *   ----------------------------------------------------------------------------------
 		 */
-		$reqUri = explode('/', Application::$request_uri);
+		$reqUri = explode('/', self::$request_uri);
 
 		/**
 		 *   ----------------------------------------------------------------------------------
@@ -147,8 +144,8 @@ class MapRoute extends Controller implements MapInterface
 		{
 			// checks if the requested method is of the given route
 			if (
-			strtoupper($_SERVER['REQUEST_METHOD']) !== self::$method &&
-			strtolower(self::$method) !== 'dynamic'
+			!in_array($_SERVER['REQUEST_METHOD'], self::$method) &&
+			!in_array('dynamic', self::$method)
 			)
 			{
 				http_response_code(405);
@@ -159,14 +156,15 @@ class MapRoute extends Controller implements MapInterface
 			$charset = self::$charset;
 
 			http_response_code(200);
-			header("Content-Type: */*; charset=$charset");
+			header("Content-Type: text/html; charset=$charset");
 
-			return [
-			 'method' => $method,
+			$s = [
+			 'method' => $_SERVER['REQUEST_METHOD'],
 			 'route' => self::$route,
 			 'params_value' => $req_value,
 			 'params' => $req
 			];
+			return $s;
 		}
 
 		return false;
@@ -196,8 +194,8 @@ class MapRoute extends Controller implements MapInterface
 		)
 		{
 			if (
-			strtoupper($_SERVER['REQUEST_METHOD']) !== self::$method &&
-			strtolower(self::$method) !== 'dynamic'
+			!in_array($_SERVER['REQUEST_METHOD'], self::$method) &&
+			!in_array('dynamic', self::$method)
 			)
 			{
 				http_response_code(405);
@@ -205,14 +203,14 @@ class MapRoute extends Controller implements MapInterface
 				exit('Method Not Allowed');
 			}
 
-			$method = self::$method;
+			$method = implode('|', self::$method);
 			$charset = self::$charset;
 
 			http_response_code(200);
-			header("Content-Type: */*; charset=$charset");
+			header("Content-Type: text/html; charset=$charset");
 
 			return [
-			 'method' => $method,
+			 'method' => $_SERVER['REQUEST_METHOD'],
 			 'route' => self::$route
 			];
 		}

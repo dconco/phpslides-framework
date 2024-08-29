@@ -12,7 +12,7 @@ $code_keys = json_encode(array_keys($codeSnippet['parsedCode']));
 <head>
    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-   <title>There was an Unexpected Error</title>
+   <title>Parse Error</title>
 </head>
 
 <style type="text/css" media="all">
@@ -89,7 +89,7 @@ header span {
 
 .code-wrapper pre code {
    padding: 10px 0;
-   font-size: 16px;
+   font-size: 14px;
    min-height: 20px;
    border-radius: 7px;
    background-color: #b8a9a9;
@@ -132,7 +132,9 @@ header span {
       <div class="code-wrapper">
          <?php foreach ($trace as $key => $value) {
          	$key = $key + 1;
-         	echo "<span>$key. {$value['file']}:{$value['line']}</span>";
+         	$_file = $value['file'] ?? 'Unknown';
+         	$_line = $value['line'] ?? 1;
+         	echo "<span>$key. {$_file}:{$_line}</span>";
          } ?>
       </div>
    </div>

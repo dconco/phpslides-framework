@@ -1,23 +1,28 @@
-Usage: php slides [command] [options] [..args]
+Usage: php slide [command] [options] [...args]
 
 Commands:
-  serve                       Run and serve the PhpSlides project in development mode.
-  make:controller <name>      Create a route controller class.
-  make:api-controller <name>  Create an API controller class.
-  make:middleware <name>      Create a middleware class.
+  serve                                 Run and serve the PhpSlides project in development mode.
+  make:controller [name] <options>      Create a route controller class.
+  make:api-controller [name] <options>  Create an API controller class.
+  make:auth-guard [name] <options>      Create an AuthGuard class.
+  generate:secret-key <length>          Generate a random bytes of string used for JWT secret keys for generating tokens.
+  -h, --help                            Show this help message and exit.
 
 Options:
-  -h, --help                  Show this help message and exit.
-      --strict                Enforce strict class standards for the generated code.
+   --strict                             Enforce strict class standards for the generated code.
 
 Examples:
-  php slides make:controller User --strict
-    Creates a route controller class named `User` with strict coding standards.
+  php slide make:controller User --strict
+     Creates a route controller class named `UserController` with strict coding standards.
 
-  php slides make:api-controller Product
-    Creates an API controller class named `Product`.
+  php slide make:api-controller Product
+     Creates an API controller class named `ProductController`.
 
-  php slides make:middleware AuthMiddleware
-    Creates a middleware class named `AuthMiddleware`.
+  php slide make:auth-guard Token
+     Creates an AuthGuard class named `TokenGuard`.
 
-For more information on each command, use `php slides <command> --help`.
+  php slide generate:secret-key 20
+     It creates 20 random characters for secret keys.
+Defaults to 32 lengths when no option is given.
+
+For more information on each command, use `php slide <command> --help`.
